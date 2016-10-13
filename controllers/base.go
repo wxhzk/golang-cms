@@ -5,19 +5,24 @@ import (
 	"github.com/astaxie/beego/context"
 	"github.com/astaxie/beego/orm"
 	"github.com/dionyself/golang-cms/core/defaults"
+	"github.com/dionyself/golang-cms/core/lib/cache"
 	database "github.com/dionyself/golang-cms/core/lib/db"
 	"github.com/dionyself/golang-cms/core/template"
+	"github.com/dionyself/golang-cms/utils"
 	"github.com/dionyself/gomobiledetect"
 )
 
 // BaseController Extendable
 type BaseController struct {
 	beego.Controller
-	db orm.Ormer
+	db    orm.Ormer
+	cache cache.CACHE
 }
 
 // ConfigPage receives template name and makes basic config to render it
 func (CTRL *BaseController) ConfigPage(page string) {
+	CTRL.GetDB()
+	CTRL.GetCache()
 	theme := template.GetActiveTheme(false)
 	CTRL.Layout = theme[0] + "/" + "layout.html"
 	device := CTRL.Ctx.Input.GetData("device_type").(string)
@@ -26,14 +31,28 @@ func (CTRL *BaseController) ConfigPage(page string) {
 	CTRL.TplName = theme[0] + "/" + page
 	CTRL.Data["Theme"] = theme[0]
 	CTRL.Data["Style"] = theme[1]
-	_ = CTRL.GetDB()
 	CTRL.Data["ModuleMenu"] = CTRL.GetModuleMenu()
+	CTRL.LayoutSections = utils.MergeMaps(CTRL.LayoutSections, CTRL.GetActiveBlocks())
+}
+
+func (CTRL *BaseController) GetActiveBlocks() map[string]string {
+	// TODO : get blocks and set block content
+	return make(map[string]string)
+}
+
+// GetCache set the cache connector into our controller
+func (CTRL *BaseController) GetCache() {
+	CTRL.cache = cache.MainCache
 }
 
 // GetDB set the orm connector into our controller
+// if repication activated we use slave to Slave
 func (CTRL *BaseController) GetDB(db ...string) orm.Ormer {
 	CTRL.db = database.MainDatabase.Orm
 	if len(db) > 0 {
+		if db[0] == "master" {
+			db[0] = "default"
+		}
 		CTRL.db.Using(db[0])
 	}
 	return CTRL.db
